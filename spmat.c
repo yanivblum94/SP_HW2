@@ -1,7 +1,7 @@
 /*
  * spmat.c
  *
- *  Created on: 2 αξΰι 2020
+ *  Created on: 2 Χ‘ΧΧΧ™ 2020
  *      Author: irist
  */
 
@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct linked_list{
+typedef struct _linked_list{
 
 	/*value*/
 	double val;
@@ -18,11 +18,11 @@ typedef struct linked_list{
 	int col;
 
 	/*next pointer*/
-	struct linked_list *next;
+	struct _linked_list* next;
 
 }linked_list;
 
-typedef struct spmat_arr{
+typedef struct _spmat_arr{
 
 	/*matrix size*/
 	int n;
@@ -43,8 +43,10 @@ typedef struct spmat_arr{
 
 void add_row_in_list(struct _spmat *A, const double *row, int i){
 	int j;
-	linked_list *currlist;
-	currlist = (linked_list)(A -> private[i]);
+	linked_list *currlist, **l;
+	l = (linked_list**)(A -> private);
+	/*printf("start add_row_in_list \n");*/
+	currlist = l[i];
 	for(j = 0; j < A->n; j++){
 		if(row[j] != 0){
 			currlist->val = row[j];
@@ -52,12 +54,13 @@ void add_row_in_list(struct _spmat *A, const double *row, int i){
 			currlist = currlist->next;
 		}
 	}
+	/*printf("done add_row_in_list \n");*/
 }
 
 void add_row_in_array(struct _spmat *A, const double *row, int i){
 	int nnz_ind,j;
 	spmat_arr *arr_imp;
-	arr_imp = A->private;
+	arr_imp = (spmat_arr*) (A->private);
 	nnz_ind = arr_imp->rowptr[i];
 	for(j=0; j<arr_imp->n; j++){
 		if(row[j]!= 0){
@@ -73,8 +76,9 @@ void add_row_in_array(struct _spmat *A, const double *row, int i){
 void free_in_list(struct _spmat *A){
 	int i;
 	linked_list *currlist;
+	linked_list **l = (linked_list**)(A -> private);
 	for(i = 0; i < A->n; i++){
-		currlist = A->private[i];
+		currlist = l[i];
 		while(currlist != NULL){
 			free(currlist);
 			currlist = currlist->next;
@@ -85,7 +89,7 @@ void free_in_list(struct _spmat *A){
 
 void free_in_array(struct _spmat *A){
 	spmat_arr *arr_imp;
-	arr_imp = A->private;
+	arr_imp = (spmat_arr*)(A->private);
 	free(arr_imp->colind);
 	free(arr_imp->rowptr);
 	free(arr_imp->values);
@@ -96,10 +100,12 @@ void mult_in_list(const struct _spmat *A, const double *v, double *result){
 	int i, j, n;
 	double dotproduct;
 	linked_list *currlist;
+	linked_list **l = (linked_list**)(A -> private);
+	printf("start mult_in_list \n");
 	n = A->n;
 	for(i = 0 ; i < n; i++){
 		dotproduct = 0.0;
-		currlist = A->private[i];
+		currlist = l[i];
 		while(currlist != NULL){
 			j = currlist->col;
 			dotproduct += currlist->val * v[j];
@@ -114,7 +120,7 @@ void mult_in_array(const struct _spmat *A, const double *v, double *result){
 	double sum;
 	int i,ind,diff,j;
 	sum=0.0;
-	arr_imp = A->private;
+	arr_imp = (spmat_arr*)(A->private);
 	for(i=0;i<arr_imp->n;i++){
 		ind = arr_imp->rowptr[i];
 		diff = arr_imp->rowptr[i+1] - arr_imp->rowptr[i];
@@ -128,28 +134,29 @@ void mult_in_array(const struct _spmat *A, const double *v, double *result){
 
 /* Allocates a new linked-lists sparse matrix of size n */
 spmat* spmat_allocate_list(int n){
-	spmat matrix;
-	matrix.private = (linked_list*)malloc(n*sizeof(linked_list));
-	matrix.add_row = add_row_in_list;
-	matrix.free = free_in_list;
-	matrix.mult = mult_in_list;
+	spmat* matrix = (spmat*)malloc(sizeof(spmat));
+	printf("spmat_allocate_list \n");
+	matrix->private = (linked_list**)malloc(n*sizeof(linked_list*));
+	matrix->add_row = &add_row_in_list;
+	matrix->free = &free_in_list;
+	matrix->mult = &mult_in_list;
 	return matrix;
 
 }
 
 /* Allocates a new arrays sparse matrix of size n with nnz non-zero elements */
 spmat* spmat_allocate_array(int n, int nnz){
-	spmat matrix;
-	spmat_arr arr_imp;
-	arr_imp.n = n;
-	arr_imp.nnz = nnz;
-	arr_imp.values = (double*)calloc(nnz, sizeof(double));
-	arr_imp.colind = (int*)calloc(nnz, sizeof(int));
-	arr_imp.rowptr = (int*)calloc(n + 1, sizeof(int));
-	matrix.private = arr_imp;
-	matrix.add_row = add_row_in_array;
-	matrix.free = free_in_array;
-	matrix.mult = mult_in_array;
+	spmat* matrix = (spmat*)malloc(sizeof(spmat));
+	spmat_arr *arr_imp = (spmat_arr*)malloc(sizeof(spmat_arr));
+	arr_imp->n = n;
+	arr_imp->nnz = nnz;
+	arr_imp->values = (double*)calloc(nnz, sizeof(double));
+	arr_imp->colind = (int*)calloc(nnz, sizeof(int));
+	arr_imp->rowptr = (int*)calloc(n + 1, sizeof(int));
+	matrix->private = (spmat_arr*)arr_imp;
+	matrix->add_row = &add_row_in_array;
+	matrix->free = &free_in_array;
+	matrix->mult = &mult_in_array;
 	return matrix;
 }
 
